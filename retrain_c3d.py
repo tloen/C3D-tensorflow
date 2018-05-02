@@ -133,17 +133,17 @@ def run_training():
     opt_finetuning = tf.train.AdamOptimizer(1e-3)
     with tf.variable_scope('var_name') as var_scope:
       weights = {
-              'wc1': _variable_with_weight_decay('wc1', [3, 3, 3, 3, 64], 0.0005),
-              'wc2': _variable_with_weight_decay('wc2', [3, 3, 3, 64, 128], 0.0005),
-              'wc3a': _variable_with_weight_decay('wc3a', [3, 3, 3, 128, 256], 0.0005),
-              'wc3b': _variable_with_weight_decay('wc3b', [3, 3, 3, 256, 256], 0.0005),
-              'wc4a': _variable_with_weight_decay('wc4a', [3, 3, 3, 256, 512], 0.0005),
-              'wc4b': _variable_with_weight_decay('wc4b', [3, 3, 3, 512, 512], 0.0005),
-              'wc5a': _variable_with_weight_decay('wc5a', [3, 3, 3, 512, 512], 0.0005),
-              'wc5b': _variable_with_weight_decay('wc5b', [3, 3, 3, 512, 512], 0.0005),
-              'wd1': _variable_with_weight_decay('wd1', [8192, 4096], 0.0005),
-              'wd2': _variable_with_weight_decay('wd2', [4096, 4096], 0.0005),
-              'out': _variable_with_weight_decay('wout', [4096, c3d_model.NUM_CLASSES], 0.0005)
+              'wc1': _variable_with_weight_decay('wc1', [3, 3, 3, 3, 64], 0.000),
+              'wc2': _variable_with_weight_decay('wc2', [3, 3, 3, 64, 128], 0.000),
+              'wc3a': _variable_with_weight_decay('wc3a', [3, 3, 3, 128, 256], 0.000),
+              'wc3b': _variable_with_weight_decay('wc3b', [3, 3, 3, 256, 256], 0.000),
+              'wc4a': _variable_with_weight_decay('wc4a', [3, 3, 3, 256, 512], 0.000),
+              'wc4b': _variable_with_weight_decay('wc4b', [3, 3, 3, 512, 512], 0.000),
+              'wc5a': _variable_with_weight_decay('wc5a', [3, 3, 3, 512, 512], 0.000),
+              'wc5b': _variable_with_weight_decay('wc5b', [3, 3, 3, 512, 512], 0.000),
+              'wd1': _variable_with_weight_decay('wd1', [8192, 4096], 0.000),
+              'wd2': _variable_with_weight_decay('wd2', [4096, 4096], 0.000),
+              'out': _variable_with_weight_decay('wout', [4096, c3d_model.NUM_CLASSES], 0.000)
               }
       biases = {
               'bc1': _variable_with_weight_decay('bc1', [64], 0.000),
@@ -162,7 +162,7 @@ def run_training():
       with tf.device('/gpu:%d' % gpu_index):
         
         varlist2 = [ weights['out'],biases['out'] ]
-        varlist1 = list( set(weights.values() + biases.values()) - set(varlist2) )
+        varlist1 = list((set(weights.values()) | set(biases.values())) - set(varlist2) )
         logit = c3d_model.transfer_c3d(
                         images_placeholder[gpu_index * FLAGS.batch_size:(gpu_index + 1) * FLAGS.batch_size,:,:,:,:],
                         0.5,
@@ -194,7 +194,7 @@ def run_training():
     null_op = tf.no_op()
 
     # Create a saver for writing training checkpoints.
-    saver = tf.train.Saver(weights.values() + biases.values())
+    saver = tf.train.Saver(list(set(weights.values()) | set(biases.values())))
     init = tf.global_variables_initializer()
 
     # Create a session for running Ops on the Graph.
@@ -202,7 +202,6 @@ def run_training():
                     config=tf.ConfigProto(allow_soft_placement=True)
                     )
     sess.run(init)
-    saver.restore(sess, model_name)
     if os.path.isfile(model_filename) and use_pretrained_model:
       saver.restore(sess, model_filename)
 
