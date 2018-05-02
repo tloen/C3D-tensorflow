@@ -5,9 +5,7 @@
 #
 #   Args:
 #       path: the path to the video folder
-#       factor: denominator that split the train and test data. if the number 
-#               is 4, then 1/4 of the data will be written to test.list and the
-#               rest of the data will be written to train.list
+#       percent: the percent of the data to be in the training set. 50 would be a half-half split.
 #   Usage:
 #       ./convert_images_to_list.sh path/to/video 4
 #   Example Usage:
@@ -20,18 +18,20 @@
 #       /Volumes/passport/datasets/action_kth/origin_images/handclapping/person01_handclapping_d2_uncomp 1
 #       ...
 
-> train.list
-> test.list
+> train_$2.list
+> test_$2.list
 COUNT=-1
 for folder in $1/*
 do
     COUNT=$[$COUNT + 1]
+
+    echo $folder
     for imagesFolder in "$folder"/*
     do
-        if (( $(jot -r 1 1 $2)  > 1 )); then
-            echo "$imagesFolder" $COUNT >> train.list
+        if (( $(shuf -i 1-100 -n 1) > $2 )); then
+            echo "$imagesFolder" $COUNT >> train_$2.list
         else
-            echo "$imagesFolder" $COUNT >> test.list
+            echo "$imagesFolder" $COUNT >> test_$2.list
         fi        
     done
 done
