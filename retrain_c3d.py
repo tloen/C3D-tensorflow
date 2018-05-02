@@ -163,7 +163,7 @@ def run_training():
         
         varlist2 = [ weights['out'],biases['out'] ]
         varlist1 = list( set(weights.values() + biases.values()) - set(varlist2) )
-        logit = c3d_model.inference_c3d(
+        logit = c3d_model.transfer_c3d(
                         images_placeholder[gpu_index * FLAGS.batch_size:(gpu_index + 1) * FLAGS.batch_size,:,:,:,:],
                         0.5,
                         FLAGS.batch_size,
@@ -202,6 +202,7 @@ def run_training():
                     config=tf.ConfigProto(allow_soft_placement=True)
                     )
     sess.run(init)
+    saver.restore(sess, model_name)
     if os.path.isfile(model_filename) and use_pretrained_model:
       saver.restore(sess, model_filename)
 
