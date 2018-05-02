@@ -114,7 +114,7 @@ def run_training():
   if not os.path.exists(model_save_dir):
       os.makedirs(model_save_dir)
   use_pretrained_model = True 
-  model_filename = "./sports1m_finetuning_ucf101.model"
+  model_filename = "./conv3d_deepnetA_sport1m_iter_1900000_TF.model"
 
   with tf.Graph().as_default():
     global_step = tf.get_variable(
@@ -170,7 +170,9 @@ def run_training():
                         weights,
                         biases
                         )
+        # logit = tf.matmul(pre_logit, weights['out2']) + biases['out2']
         loss_name_scope = ('gpud_%d_loss' % gpu_index)
+
         loss = tower_loss(
                         loss_name_scope,
                         logit,
@@ -194,7 +196,8 @@ def run_training():
     null_op = tf.no_op()
 
     # Create a saver for writing training checkpoints.
-    saver = tf.train.Saver(list(set(weights.values()) | set(biases.values())))
+    # Only load pre-activation weights.
+    saver = tf.train.Saver(varlist1)
     init = tf.global_variables_initializer()
 
     # Create a session for running Ops on the Graph.
