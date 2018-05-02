@@ -29,9 +29,9 @@ do
     for imagesFolder in "$folder"/*
     do
         if (( $(shuf -i 1-100 -n 1) > $2 )); then
-            echo "$imagesFolder" $COUNT >> train_$2.list
-        else
             echo "$imagesFolder" $COUNT >> test_$2.list
+        else
+            echo "$imagesFolder" $COUNT >> train_$2.list
         fi        
     done
 done
