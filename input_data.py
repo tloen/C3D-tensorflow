@@ -58,8 +58,8 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
   if random_embeddings:
     # fix the random embeddings
     np.random.seed(1729)
-    embeddings = np.random.randn(len(lines), 16, 10) # MOVE EMBEDDING_DIM TO THIS FILE
-    # embeddings = np.zeros(len(lines), 16, 10) # MOVE EMBEDDING_DIM TO THIS FILE
+    # embeddings = np.random.randn(len(lines), 16, 10) # MOVE EMBEDDING_DIM TO THIS FILE
+    embeddings = np.zeros((len(lines), 16, 10)) # MOVE EMBEDDING_DIM TO THIS FILE
   else:
     print('NOTIMPLEMENTED')
 

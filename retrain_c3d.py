@@ -252,6 +252,7 @@ def run_training():
                             labels_placeholder: train_labels,
                             embeddings_placeholder: train_embeddings
                             })
+        # print(train_embeddings)
         print ("accuracy: " + "{:.5f}".format(acc))
         train_writer.add_summary(summary, step)
         print('Validation Data Eval:')
