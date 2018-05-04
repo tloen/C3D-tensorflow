@@ -44,15 +44,25 @@ def get_frames_data(filename, num_frames_per_clip=16):
       ret_arr.append(img_data)
   return ret_arr, s_index
 
-def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=16, crop_size=112, shuffle=False):
+def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=16, crop_size=112, shuffle=False, random_embeddings=True):
   lines = open(filename,'r')
   read_dirnames = []
   data = []
   label = []
+  embed = []
   batch_index = 0
   next_batch_start = -1
   lines = list(lines)
   np_mean = np.load('crop_mean.npy').reshape([num_frames_per_clip, crop_size, crop_size, 3])
+  
+  if random_embeddings:
+    # fix the random embeddings
+    np.random.seed(1729)
+    embeddings = np.random.randn(len(lines), 16, 10) # MOVE EMBEDDING_DIM TO THIS FILE
+    # embeddings = np.zeros(len(lines), 16, 10) # MOVE EMBEDDING_DIM TO THIS FILE
+  else:
+    print('NOTIMPLEMENTED')
+
   # Forcing shuffle, if start_pos is not specified
   if start_pos < 0:
     shuffle = True
@@ -89,6 +99,7 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
         img_datas.append(img)
       data.append(img_datas)
       label.append(int(tmp_label))
+      embed.append(embeddings[index, :, :])
       batch_index = batch_index + 1
       read_dirnames.append(dirname)
 
@@ -99,8 +110,9 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
     for i in range(pad_len):
       data.append(img_datas)
       label.append(int(tmp_label))
-
+      embed.append(embeddings[video_indices[-1], :, :])
   np_arr_data = np.array(data).astype(np.float32)
   np_arr_label = np.array(label).astype(np.int64)
+  np_arr_embed = np.array(embed).astype(np.float32)
+  return np_arr_data, np_arr_label, np_arr_embed, next_batch_start, read_dirnames, valid_len
 
-  return np_arr_data, np_arr_label, next_batch_start, read_dirnames, valid_len

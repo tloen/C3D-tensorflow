@@ -22,6 +22,8 @@ forward to make predictions.
 
 import tensorflow as tf
 
+EMBEDDING_DIM = 10
+
 # The UCF-101 dataset has 101 classes
 NUM_CLASSES = 101
 
@@ -31,6 +33,7 @@ CHANNELS = 3
 
 # Number of frames per video clip
 NUM_FRAMES_PER_CLIP = 16
+TOTAL_EMBEDDING_DIM = EMBEDDING_DIM * NUM_FRAMES_PER_CLIP
 
 "-----------------------------------------------------------------------------------------------------------------------"
 
@@ -92,7 +95,7 @@ def inference_c3d(_X, _dropout, batch_size, _weights, _biases):
 
   return out
 
-def transfer_c3d(_X, _dropout, batch_size, _weights, _biases):
+def transfer_c3d(_X, _embeddings, _dropout, batch_size, _weights, _biases):
 
   # Convolution Layer
   conv1 = conv3d('conv1', _X, _weights['wc1'], _biases['bc1'])
@@ -127,11 +130,16 @@ def transfer_c3d(_X, _dropout, batch_size, _weights, _biases):
 
   # Fully connected layer
   pool5 = tf.transpose(pool5, perm=[0,1,4,2,3])
-  pool5 = tf.stop_gradient(pool5)
+  #pool5 = tf.stop_gradient(pool5)
 
-  dense1 = tf.reshape(pool5, [batch_size, _weights['wd1'].get_shape().as_list()[0]]) # Reshape conv3 output to fit dense layer input
+  full_layer_dim = _weights['wd1'].get_shape().as_list()[0]
+  just_prior_dim = full_layer_dim - TOTAL_EMBEDDING_DIM
+  # print(_embeddings)
+  embeddings_flat = tf.reshape(_embeddings, [batch_size, TOTAL_EMBEDDING_DIM])
+  dense1 = tf.reshape(pool5, [batch_size, just_prior_dim]) # Reshape conv3 output to fit dense layer input
+  
+  dense1 = tf.concat([dense1, embeddings_flat], axis=-1) 
   dense1 = tf.matmul(dense1, _weights['wd1']) + _biases['bd1']
-
   dense1 = tf.nn.relu(dense1, name='fc1') # Relu activation
   dense1 = tf.nn.dropout(dense1, _dropout)
 

@@ -30,7 +30,9 @@ flags = tf.app.flags
 gpu_num = 2
 #flags.DEFINE_float('learning_rate', 0.0, 'Initial learning rate.')
 flags.DEFINE_integer('max_steps', 5000, 'Number of steps to run trainer.')
+flags.DEFINE_integer('percent_train', 10, 'Percentage of data in training set.')
 flags.DEFINE_integer('batch_size', 10, 'Batch size.')
+flags.DEFINE_boolean('semi_supervised', True, 'Include semisupervised?')
 FLAGS = flags.FLAGS
 MOVING_AVERAGE_DECAY = 0.9999
 model_save_dir = './models'
@@ -57,7 +59,11 @@ def placeholder_inputs(batch_size):
                                                          c3d_model.CROP_SIZE,
                                                          c3d_model.CHANNELS))
   labels_placeholder = tf.placeholder(tf.int64, shape=(batch_size))
-  return images_placeholder, labels_placeholder
+  
+  embeddings_placeholder = tf.placeholder(tf.float32, shape=(batch_size,
+                                                         c3d_model.NUM_FRAMES_PER_CLIP,
+                                                         c3d_model.EMBEDDING_DIM))
+  return images_placeholder, labels_placeholder, embeddings_placeholder
 
 def average_gradients(tower_grads):
   average_grads = []
@@ -69,6 +75,7 @@ def average_gradients(tower_grads):
     grad = tf.concat(grads, 0)
     grad = tf.reduce_mean(grad, 0)
     v = grad_and_vars[0][1]
+
     grad_and_var = (grad, v)
     average_grads.append(grad_and_var)
   return average_grads
@@ -123,7 +130,7 @@ def run_training():
                     initializer=tf.constant_initializer(0),
                     trainable=False
                     )
-    images_placeholder, labels_placeholder = placeholder_inputs(
+    images_placeholder, labels_placeholder, embeddings_placeholder = placeholder_inputs(
                     FLAGS.batch_size * gpu_num
                     )
     tower_grads1 = []
@@ -141,7 +148,7 @@ def run_training():
               'wc4b': _variable_with_weight_decay('wc4b', [3, 3, 3, 512, 512], 0.000),
               'wc5a': _variable_with_weight_decay('wc5a', [3, 3, 3, 512, 512], 0.000),
               'wc5b': _variable_with_weight_decay('wc5b', [3, 3, 3, 512, 512], 0.000),
-              'wd1': _variable_with_weight_decay('wd1', [8192, 4096], 0.000),
+              'wd1': _variable_with_weight_decay('wd1', [8192 + c3d_model.TOTAL_EMBEDDING_DIM, 4096], 0.000),
               'wd2': _variable_with_weight_decay('wd2', [4096, 4096], 0.000),
               'out': _variable_with_weight_decay('wout', [4096, c3d_model.NUM_CLASSES], 0.000)
               }
@@ -161,11 +168,13 @@ def run_training():
     for gpu_index in range(0, gpu_num):
       with tf.device('/gpu:%d' % gpu_index):
         
-        varlist2 = [ weights['out'],biases['out'] ]
+        varlist2 = [ weights['wd1'], weights['wd2'], weights['out'], 
+                        biases['bd1'], biases['bd2'], biases['out'] ]
         varlist1 = list((set(weights.values()) | set(biases.values())) - set(varlist2) )
         logit = c3d_model.transfer_c3d(
                         images_placeholder[gpu_index * FLAGS.batch_size:(gpu_index + 1) * FLAGS.batch_size,:,:,:,:],
-                        0.5,
+                        embeddings_placeholder[gpu_index * FLAGS.batch_size:(gpu_index + 1) * FLAGS.batch_size,:,:], # FIX THIS?
+			0.5,
                         FLAGS.batch_size,
                         weights,
                         biases
@@ -210,12 +219,16 @@ def run_training():
 
     # Create summary writter
     merged = tf.summary.merge_all()
-    train_writer = tf.summary.FileWriter('./visual_logs/train', sess.graph)
-    test_writer = tf.summary.FileWriter('./visual_logs/test', sess.graph)
+    train_writer = tf.summary.FileWriter('./visual_logs/train_zeroembed_%d' % FLAGS.percent_train, sess.graph)
+    test_writer = tf.summary.FileWriter('./visual_logs/test_zeroembed_%d' % FLAGS.percent_train, sess.graph)
+    
+    # used later as a substitute value for the embeddings 
+    # rand_embeddings = tf.random_normal((FLAGS.batch_size, c3d_model.NUM_FRAMES_PER_CLIP, c3d_model.EMBEDDING_DIM))
+    
     for step in xrange(FLAGS.max_steps):
       start_time = time.time()
-      train_images, train_labels, _, _, _ = input_data.read_clip_and_label(
-                      filename='list/train.list',
+      train_images, train_labels, train_embeddings, _, _, _ = input_data.read_clip_and_label(
+                      filename='list/train_%d.list' % FLAGS.percent_train,
                       batch_size=FLAGS.batch_size * gpu_num,
                       num_frames_per_clip=c3d_model.NUM_FRAMES_PER_CLIP,
                       crop_size=c3d_model.CROP_SIZE,
@@ -223,25 +236,27 @@ def run_training():
                       )
       sess.run(train_op, feed_dict={
                       images_placeholder: train_images,
-                      labels_placeholder: train_labels
+                      labels_placeholder: train_labels,
+                      embeddings_placeholder: train_embeddings
                       })
       duration = time.time() - start_time
       print('Step %d: %.3f sec' % (step, duration))
 
       # Save a checkpoint and evaluate the model periodically.
       if (step) % 10 == 0 or (step + 1) == FLAGS.max_steps:
-        saver.save(sess, os.path.join(model_save_dir, 'c3d_ucf_model'), global_step=step)
+        saver.save(sess, os.path.join(model_save_dir, 'c3d_ucf_model_%d_pct' % FLAGS.percent_train), global_step=step)
         print('Training Data Eval:')
         summary, acc = sess.run(
                         [merged, accuracy],
                         feed_dict={images_placeholder: train_images,
-                            labels_placeholder: train_labels
+                            labels_placeholder: train_labels,
+                            embeddings_placeholder: train_embeddings
                             })
         print ("accuracy: " + "{:.5f}".format(acc))
         train_writer.add_summary(summary, step)
         print('Validation Data Eval:')
-        val_images, val_labels, _, _, _ = input_data.read_clip_and_label(
-                        filename='list/test.list',
+        val_images, val_labels, val_embeddings, _, _, _ = input_data.read_clip_and_label(
+                        filename='list/test_%d.list' % FLAGS.percent_train,
                         batch_size=FLAGS.batch_size * gpu_num,
                         num_frames_per_clip=c3d_model.NUM_FRAMES_PER_CLIP,
                         crop_size=c3d_model.CROP_SIZE,
@@ -251,7 +266,8 @@ def run_training():
                         [merged, accuracy],
                         feed_dict={
                                         images_placeholder: val_images,
-                                        labels_placeholder: val_labels
+                                        labels_placeholder: val_labels,
+                                        embeddings_placeholder: val_embeddings
                                         })
         print ("accuracy: " + "{:.5f}".format(acc))
         test_writer.add_summary(summary, step)
