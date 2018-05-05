@@ -52,7 +52,7 @@ def read_clip(filename, batch_size, start_pos=-1, num_frames_per_clip=16, crop_s
   batch_index = 0
   next_batch_start = -1
   lines = list(lines)
-  np_mean = np.load('crop_mean.npy')
+  np_mean = np.load('../crop_mean.npy')
   np_mean = np.repeat(np_mean, 2, 1)
   np_mean = np.repeat(np_mean, 2, 2)
   np_mean = np_mean.reshape([num_frames_per_clip, crop_size, crop_size, 3])
