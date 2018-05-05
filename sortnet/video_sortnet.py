@@ -13,17 +13,21 @@ pass in sorted video frames!
 '''
 
 
-batch_size = 4
-video_size = 16
+batch_size = 2 
+video_size = 5
 total_size = batch_size * video_size
 
 video_data = tf.placeholder(tf.float32, [batch_size, video_size, 224, 224, 3])
 
 batch_video_data = tf.reshape(video_data, [total_size, 224, 224, 3])
 
+# for i in range(2):
+
 pre_logit, epoints = resnet_v2.resnet_v2_50(
   inputs = batch_video_data,
-  num_classes = None
+  num_classes = None,
+  # reuse = True,
+  scope = 'resnet'
 )
 
 # pre_logit = tf.reshape(pre_logit, [total_size, 2048])
@@ -51,12 +55,12 @@ def pl_kl(scores):
   return costs
 
 fwd_costs = pl_kl(scores)
-rev_scores = tf.reverse(scores, axis=2)
+rev_scores = tf.reverse(scores, axis=[2])
 rev_costs = pl_kl(rev_scores)
-costs = tf.maximum(fwd_costs, rev_costs)
+costs = tf.minimum(fwd_costs, rev_costs)
 cost = tf.reduce_sum(costs)
 
-opt = tf.train.AdamOptimizer(1e-3)
+opt = tf.train.AdamOptimizer(1e-5)
 train_op = opt.minimize(cost)
 with tf.Session() as sess:
   sess.run(tf.global_variables_initializer())
@@ -64,14 +68,13 @@ with tf.Session() as sess:
     arr, nbs, rdn, vl = input_data.read_clip(
           '../list/train.list', 
           batch_size, 
-          num_frames_per_clip=16,
+          num_frames_per_clip=video_size,
           start_pos=0, 
           shuffle=True
     )
-    print(rdn)
     # arr = arr.reshape([batch_size, 16, 224, 224, 3])
-    ll, s, _ = sess.run([log_likelihood, normalized_potentials, train_op], feed_dict={video_data: arr})
-    print(s, ll)
+    ll, _ = sess.run([cost, train_op], feed_dict={video_data: arr})
+    print(t, ll)
 
   
 
