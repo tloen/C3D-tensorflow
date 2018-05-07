@@ -22,7 +22,7 @@
 > train_${2}_$3.list
 > dev_${2}_$3.list
 > test_${2}_$3.list
-
+> all.list
 
 COUNT=-1
 for folder in $1/*
@@ -39,6 +39,7 @@ do
             echo "$imagesFolder" $COUNT >> dev_${2}_$3.list
         else
             echo "$imagesFolder" $COUNT >> train_${2}_$3.list
-        fi        
+        fi
+        echo "$imagesFolder" $COUNT >> all.list        
     done
 done
