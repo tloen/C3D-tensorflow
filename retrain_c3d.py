@@ -30,7 +30,9 @@ flags = tf.app.flags
 gpu_num = 2
 #flags.DEFINE_float('learning_rate', 0.0, 'Initial learning rate.')
 flags.DEFINE_integer('max_steps', 5000, 'Number of steps to run trainer.')
-flags.DEFINE_integer('percent_train', 10, 'Percentage of data in training set.')
+flags.DEFINE_integer('percent_train', 16, 'Percentage of data in training set.')
+flags.DEFINE_integer('percent_dev', 4, 'Percentage of data in dev set.')
+
 flags.DEFINE_integer('batch_size', 10, 'Batch size.')
 flags.DEFINE_boolean('semi_supervised', True, 'Include semisupervised?')
 FLAGS = flags.FLAGS
@@ -136,8 +138,8 @@ def run_training():
     tower_grads1 = []
     tower_grads2 = []
     logits = []
-    opt_stable = tf.train.AdamOptimizer(1e-4)
-    opt_finetuning = tf.train.AdamOptimizer(1e-3)
+    opt_stable = tf.train.AdamOptimizer(1e-5)
+    opt_finetuning = tf.train.AdamOptimizer(1e-4)
     with tf.variable_scope('var_name') as var_scope:
       weights = {
               'wc1': _variable_with_weight_decay('wc1', [3, 3, 3, 3, 64], 0.000),
@@ -219,8 +221,8 @@ def run_training():
 
     # Create summary writter
     merged = tf.summary.merge_all()
-    train_writer = tf.summary.FileWriter('./visual_logs/train_zeroembed_%d' % FLAGS.percent_train, sess.graph)
-    test_writer = tf.summary.FileWriter('./visual_logs/test_zeroembed_%d' % FLAGS.percent_train, sess.graph)
+    train_writer = tf.summary.FileWriter('./visual_logs_classifier/train_x_%d' % FLAGS.percent_train, sess.graph)
+    test_writer = tf.summary.FileWriter('./visual_logs_classifier/test_x_%d' % FLAGS.percent_train, sess.graph)
     
     # used later as a substitute value for the embeddings 
     # rand_embeddings = tf.random_normal((FLAGS.batch_size, c3d_model.NUM_FRAMES_PER_CLIP, c3d_model.EMBEDDING_DIM))
@@ -228,11 +230,11 @@ def run_training():
     for step in xrange(FLAGS.max_steps):
       start_time = time.time()
       train_images, train_labels, train_embeddings, _, _, _ = input_data.read_clip_and_label(
-                      filename='list/train_%d.list' % FLAGS.percent_train,
+                      filename='list/train_%d_%d.list' % (FLAGS.percent_train, FLAGS.percent_dev),
                       batch_size=FLAGS.batch_size * gpu_num,
                       num_frames_per_clip=c3d_model.NUM_FRAMES_PER_CLIP,
                       crop_size=c3d_model.CROP_SIZE,
-                      shuffle=True
+                      shuffle=True # CHANGE THIS
                       )
       sess.run(train_op, feed_dict={
                       images_placeholder: train_images,
@@ -257,7 +259,7 @@ def run_training():
         train_writer.add_summary(summary, step)
         print('Validation Data Eval:')
         val_images, val_labels, val_embeddings, _, _, _ = input_data.read_clip_and_label(
-                        filename='list/test_%d.list' % FLAGS.percent_train,
+                        filename='list/dev_%d_%d.list' % (FLAGS.percent_train, FLAGS.percent_dev),
                         batch_size=FLAGS.batch_size * gpu_num,
                         num_frames_per_clip=c3d_model.NUM_FRAMES_PER_CLIP,
                         crop_size=c3d_model.CROP_SIZE,
