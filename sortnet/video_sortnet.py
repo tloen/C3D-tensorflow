@@ -110,7 +110,7 @@ opt_fc = tf.train.AdamOptimizer(learning_rate)
 global_step_tensor = tf.Variable(1, trainable=False, name='global_step')
 
 train_conv = opt_conv.minimize(cost, var_list = orig_vars)
-train_fc = opt_fc.minimize(cost, var_list = orig_vars, global_step = global_step_tensor)
+train_fc = opt_fc.minimize(cost, var_list = post_conv_vars, global_step = global_step_tensor)
 
 train_op = tf.group(train_conv, train_fc)
 
@@ -128,7 +128,7 @@ with tf.Session() as sess:
   # print(sess.run(batch_kendall_tau(tf.constant([[1, 2, 3, 4, 5], [1, 3, 2, 4, 5]], dtype=tf.float32))))
   # print(sess.run(batch_kendall_tau(tf.constant([[5, 4, 3, 2, 1]], dtype=tf.float32))))
   merged = tf.summary.merge_all()
-  train_writer = tf.summary.FileWriter('../visual_logs/' + experiment_id, sess.graph)
+  train_writer = tf.summary.FileWriter('../visual_logs/new_' + experiment_id, sess.graph)
   sess.run(tf.global_variables_initializer())
   ckpt = tf.train.latest_checkpoint('../models/' + experiment_id + '/')
   if ckpt:
