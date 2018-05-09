@@ -59,7 +59,7 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
     # fix the random embeddings
     np.random.seed(1729)
     # embeddings = np.random.randn(len(lines), 16, 10) # MOVE EMBEDDING_DIM TO THIS FILE
-    embeddings = np.zeros((len(lines), 16, 10)) # MOVE EMBEDDING_DIM TO THIS FILE
+    embeddings = np.ones((len(lines), 16, 10)) # MOVE EMBEDDING_DIM TO THIS FILE
   else:
     print('NOTIMPLEMENTED')
 
@@ -81,7 +81,8 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
     dirname = line[0]
     tmp_label = line[1]
     if not shuffle:
-      print("Loading a video clip from {}...".format(dirname))
+      pass
+      # print("Loading a video clip from {}...".format(dirname))
     tmp_data, _ = get_frames_data(dirname, num_frames_per_clip)
     img_datas = [];
     if(len(tmp_data)!=0):
