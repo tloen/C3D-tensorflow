@@ -20,10 +20,10 @@ with open('./s_train_%s.list' % split_id, 'w') as train_file, \
     videos = filenames[l]
     num_videos = len(videos)
     
-    b = [0, TRAIN * num_videos, (TRAIN + DEV) * num_videos, num_videos]
+    b = [0, DEV * num_videos, (TRAIN + DEV) * num_videos, num_videos]
     b = [round(boundary) for boundary in b]
-    train = videos[b[0]:b[1]]
-    dev = videos[b[1]:b[2]]
+    dev = videos[b[0]:b[1]]
+    train = videos[b[1]:b[2]]
     test = videos[b[2]:b[3]]
     for vid in train:
       print(vid, l, file=train_file)
