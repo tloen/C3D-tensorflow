@@ -115,6 +115,10 @@ def _variable_with_weight_decay(name, shape, wd):
     tf.add_to_collection('weightdecay_losses', weight_decay)
   return var
 
+percent_test = 100 - FLAGS.percent_train - FLAGS.percent_dev
+experiment_id = '%d_%d_%d' % (FLAGS.percent_train, FLAGS.percent_dev, percent_test)
+
+
 def run_training():
   # Get the sets of images and labels for training, validation, and
   # Tell TensorFlow that the model will be built into the default Graph.
@@ -221,8 +225,8 @@ def run_training():
 
     # Create summary writter
     merged = tf.summary.merge_all()
-    train_writer = tf.summary.FileWriter('./visual_logs_classifier/train_x_%d' % FLAGS.percent_train, sess.graph)
-    test_writer = tf.summary.FileWriter('./visual_logs_classifier/test_x_%d' % FLAGS.percent_train, sess.graph)
+    train_writer = tf.summary.FileWriter('./visual_logs_classifier/train_stratified_%s' % experiment_id, sess.graph)
+    test_writer = tf.summary.FileWriter('./visual_logs_classifier/test_stratified_%s' % experiment_id, sess.graph)
     
     # used later as a substitute value for the embeddings 
     # rand_embeddings = tf.random_normal((FLAGS.batch_size, c3d_model.NUM_FRAMES_PER_CLIP, c3d_model.EMBEDDING_DIM))
@@ -230,7 +234,7 @@ def run_training():
     for step in xrange(FLAGS.max_steps):
       start_time = time.time()
       train_images, train_labels, train_embeddings, _, _, _ = input_data.read_clip_and_label(
-                      filename='list/train_%d_%d.list' % (FLAGS.percent_train, FLAGS.percent_dev),
+                      filename='list/s_train_%s.list' % experiment_id,
                       batch_size=FLAGS.batch_size * gpu_num,
                       num_frames_per_clip=c3d_model.NUM_FRAMES_PER_CLIP,
                       crop_size=c3d_model.CROP_SIZE,
@@ -246,7 +250,7 @@ def run_training():
 
       # Save a checkpoint and evaluate the model periodically.
       if (step) % 10 == 0 or (step + 1) == FLAGS.max_steps:
-        saver.save(sess, os.path.join(model_save_dir, 'c3d_ucf_model_%d_pct' % FLAGS.percent_train), global_step=step)
+        saver.save(sess, os.path.join(model_save_dir, 'stratified_ucf_model_%s/model' % experiment_id ), global_step=step)
         print('Training Data Eval:')
         summary, acc = sess.run(
                         [merged, accuracy],
@@ -259,7 +263,7 @@ def run_training():
         train_writer.add_summary(summary, step)
         print('Validation Data Eval:')
         val_images, val_labels, val_embeddings, _, _, _ = input_data.read_clip_and_label(
-                        filename='list/dev_%d_%d.list' % (FLAGS.percent_train, FLAGS.percent_dev),
+                        filename='list/s_dev_%s.list' % experiment_id,
                         batch_size=FLAGS.batch_size * gpu_num,
                         num_frames_per_clip=c3d_model.NUM_FRAMES_PER_CLIP,
                         crop_size=c3d_model.CROP_SIZE,
