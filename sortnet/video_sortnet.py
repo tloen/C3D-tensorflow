@@ -12,6 +12,10 @@ flags.DEFINE_integer('learning_rate_nl10', 5, 'Negative log-10 of the learning r
 flags.DEFINE_boolean('cont', True, 'continue from saved checkpoint.')
 flags.DEFINE_integer('num_frames', 5, 'Number of frames to sort.')
 flags.DEFINE_integer('batch_size', 4, 'Number of videos to sort at once.')
+flags.DEFINE_integer('percent_train', 16, 'Percentage of data the classifer will be trained on.')
+flags.DEFINE_integer('percent_dev', 4, 'Percentage of data in the dev set.')
+
+
 FLAGS = flags.FLAGS
 learning_rate = 10 ** -FLAGS.learning_rate_nl10
 
@@ -51,8 +55,8 @@ post_conv_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='post
 
 def pl_kl(scores):
   # log-sum-exp. this cancels itself out
-  max_score = tf.reduce_max(scores, axis=1)
-  # scores -= max_score
+  max_score = tf.reduce_max(scores, axis=1, keepdims=True)
+  scores -= max_score
 
   potentials = tf.exp(scores)
 
@@ -61,7 +65,7 @@ def pl_kl(scores):
   denominators = tf.cumsum(potentials, reverse=True, axis=1)
 
   log_potentials = scores
-  log_denominators = tf.log(denominators)
+  log_denominators = tf.log(denominators + 1e-20)
 
   # plackett-luce
   log_likelihood = tf.reduce_sum(log_potentials, axis=1) - tf.reduce_sum(log_denominators, axis=1)
@@ -77,7 +81,7 @@ def batch_kendall_tau(scores):
   s1 = tf.expand_dims(scores, 2)
   s2 = tf.expand_dims(scores, 1)
   D2 = tf.sign(s2 - s1)
-  return -tf.reduce_sum(D1 * D2) / batch_size / (video_size * (video_size - 1))
+  return tf.reduce_sum(D1 * D2) / batch_size / (video_size * (video_size - 1))
 
 def accuracy(scores):
   true_i = tf.range(video_size)
@@ -114,7 +118,7 @@ train_fc = opt_fc.minimize(cost, var_list = post_conv_vars, global_step = global
 
 train_op = tf.group(train_conv, train_fc)
 
-saver = tf.train.Saver(orig_vars)
+saver = tf.train.Saver(keep_checkpoint_every_n_hours=1)
 
 restore_model = slim.assign_from_checkpoint_fn(
   './resnet_v2_50.ckpt',
@@ -122,25 +126,29 @@ restore_model = slim.assign_from_checkpoint_fn(
   ignore_missing_vars = True
 )
 
-experiment_id = 'retrained_sortnet_%d_f%d_b%d' % (FLAGS.learning_rate_nl10, FLAGS.num_frames, FLAGS.batch_size) 
+percent_test = 100 - FLAGS.percent_train - FLAGS.percent_dev
+
+split_id = '%d_%d_%d' % (FLAGS.percent_train, FLAGS.percent_dev, percent_test)
+experiment_id = 'retrained_sortnet_l%d_f%d_b%d_d%d' % (FLAGS.learning_rate_nl10, FLAGS.num_frames, FLAGS.batch_size, FLAGS.percent_dev) 
 
 with tf.Session() as sess:
   # print(sess.run(batch_kendall_tau(tf.constant([[1, 2, 3, 4, 5], [1, 3, 2, 4, 5]], dtype=tf.float32))))
   # print(sess.run(batch_kendall_tau(tf.constant([[5, 4, 3, 2, 1]], dtype=tf.float32))))
   merged = tf.summary.merge_all()
-  train_writer = tf.summary.FileWriter('../visual_logs/new_' + experiment_id, sess.graph)
+  train_writer = tf.summary.FileWriter('../visual_logs/%s' % experiment_id, sess.graph)
+  dev_writer = tf.summary.FileWriter('../visual_logs/%s_dev' % experiment_id, sess.graph)
   sess.run(tf.global_variables_initializer())
   ckpt = tf.train.latest_checkpoint('../models/' + experiment_id + '/')
   if ckpt:
     print('found checkpoint at %s' % ckpt)
     saver.restore(sess, ckpt)
   else:
-    print('initializing model from pretrained_weights...')
+    print('initializing model from pretrained weights...')
     restore_model(sess)
   for _ in range(10000000):
     arr, nbs, rdn, vl = input_data.read_clip(
-          '../list/all.list', 
-          batch_size, 
+          '../list/s_sortnet_train_%s.list' % split_id, 
+          batch_size,
           num_frames_per_clip=video_size,
           start_pos=0, 
           shuffle=True
@@ -149,13 +157,22 @@ with tf.Session() as sess:
     _ = sess.run(train_op, feed_dict={video_data: arr})
     time = tf.train.global_step(sess, global_step_tensor)
     print(time)
-    if time % 5 == 0:
+    if time % 10 == 0:
       summary, loss, t, a = sess.run([merged, cost, tau, acc], feed_dict={video_data: arr})
       train_writer.add_summary(summary, time)
       print("E: %s Cost: %f Tau: %f Acc: %f" % (experiment_id, loss, t, a))
-    if time % 200 == 0:
+    if time % 1000 == 0:
       saver.save(sess, '../models/' + experiment_id + '/checkpoint', global_step = time)
-      
+    if time % 10 == 0:
+      arr, nbs, rdn, vl = input_data.read_clip(
+	    '../list/s_dev_%s.list' % split_id, 
+	    batch_size, 
+	    num_frames_per_clip=video_size,
+	    start_pos=0, 
+	    shuffle=True
+      )
+      summary, loss, t, a = sess.run([merged, cost, tau, acc], feed_dict={video_data: arr})
+      dev_writer.add_summary(summary, time)
   
 
 '''
