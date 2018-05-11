@@ -1,4 +1,4 @@
-with open('./all.list', 'r') as all_file:
+with open('./all5.list', 'r') as all_file:
   filenames = [[] for _ in range(101)]
   for line in all_file:
     v, l = line.split(' ')
@@ -12,10 +12,10 @@ TEST = .8
 split_id = '%d_%d_%d' % (TRAIN * 100, DEV * 100, TEST * 100)
 print(split_id)
 
-with open('./s_train_%s.list' % split_id, 'w') as train_file, \
-    open('./s_dev_%s.list' % split_id, 'w') as dev_file, \
-    open('./s_test_%s.list' % split_id, 'w') as test_file, \
-    open('./s_sortnet_train_%s.list' % split_id, 'w') as sortnet_train_file:
+with open('./s5_train_%s.list' % split_id, 'w') as train_file, \
+    open('./s5_dev_%s.list' % split_id, 'w') as dev_file, \
+    open('./s5_test_%s.list' % split_id, 'w') as test_file, \
+    open('./s5_sortnet_train_%s.list' % split_id, 'w') as sortnet_train_file:
   for l in range(101):
     videos = filenames[l]
     num_videos = len(videos)
