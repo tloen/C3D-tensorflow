@@ -14,6 +14,8 @@ flags.DEFINE_integer('num_frames', 5, 'Number of frames to sort.')
 flags.DEFINE_integer('batch_size', 4, 'Number of videos to sort at once.')
 flags.DEFINE_integer('percent_train', 16, 'Percentage of data the classifer will be trained on.')
 flags.DEFINE_integer('percent_dev', 4, 'Percentage of data in the dev set.')
+flags.DEFINE_boolean('big_embeddings', False, 'Whether to use size-1024 embeddings.')
+flags.DEFINE_boolean('uniform_sampling', False, 'Whether to sample uniformly from the video.')
 
 FLAGS = flags.FLAGS
 learning_rate = 10 ** -FLAGS.learning_rate_nl10
@@ -46,7 +48,7 @@ orig_vars = slim.get_variables_to_restore()
 
 with tf.variable_scope('post_conv'):
   # pre_logit = tf.reshape(pre_logit, [total_size, 2048])
-  embeddings = layers.fully_connected(pre_logit, 1024, activation_fn=None)
+  embeddings = layers.fully_connected(pre_logit, 1024 if FLAGS.big_embeddings else 10, activation_fn=None)
   activations = tf.nn.relu(embeddings)
   scores = layers.fully_connected(activations, 1, activation_fn=None)
   scores = tf.reshape(scores, [batch_size, video_size, 1])
@@ -129,7 +131,14 @@ restore_model = slim.assign_from_checkpoint_fn(
 percent_test = 100 - FLAGS.percent_train - FLAGS.percent_dev
 
 split_id = '%d_%d_%d' % (FLAGS.percent_train, FLAGS.percent_dev, percent_test)
-experiment_id = '5fps_sortnet_1024_l%d_f%d_b%d_d%d' % (FLAGS.learning_rate_nl10, FLAGS.num_frames, FLAGS.batch_size, FLAGS.percent_dev) 
+
+experiment_id = '5fps_sortnet_l%d_f%d_b%d_d%d' % (FLAGS.learning_rate_nl10, FLAGS.num_frames, FLAGS.batch_size, FLAGS.percent_dev) 
+
+if FLAGS.uniform_sampling:
+  experiment_id += '_us'
+
+if FLAGS.big_embeddings:
+  experiment_id += '_big'
 
 with tf.Session() as sess:
   # print(sess.run(batch_kendall_tau(tf.constant([[1, 2, 3, 4, 5], [1, 3, 2, 4, 5]], dtype=tf.float32))))
@@ -151,7 +160,8 @@ with tf.Session() as sess:
           batch_size,
           num_frames_per_clip=video_size,
           start_pos=0, 
-          shuffle=True
+          shuffle=True,
+          uniform_sampling=FLAGS.uniform_sampling
     )
     # arr = arr.reshape([batch_size, 16, 224, 224, 3])
     _ = sess.run(train_op, feed_dict={video_data: arr})
@@ -166,11 +176,11 @@ with tf.Session() as sess:
     if time % 10 == 0:
       arr, nbs, rdn, vl = input_data.read_clip(
 	    '../list/s5_dev_%s.list' % split_id, 
-
 	    batch_size, 
 	    num_frames_per_clip=video_size,
 	    start_pos=0, 
-	    shuffle=True
+	    shuffle=True,
+            uniform_sampling=FLAGS.uniform_sampling
       )
       summary, loss, t, a = sess.run([merged, cost, tau, acc], feed_dict={video_data: arr})
       dev_writer.add_summary(summary, time)

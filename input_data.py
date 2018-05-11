@@ -28,7 +28,7 @@ import cv2
 import time
 from sortnet import embedding_generator
 
-def get_frames_data(filename, num_frames_per_clip=16):
+def get_frames_data(filename, num_frames_per_clip=16, uniform_sampling):
   ''' Given a directory containing extracted frames, return a video clip of
   (num_frames_per_clip) consecutive frames as a list of np arrays '''
   ret_arr = []
@@ -37,15 +37,20 @@ def get_frames_data(filename, num_frames_per_clip=16):
     if(len(filenames)<num_frames_per_clip):
       return [], s_index
     filenames = sorted(filenames)
-    s_index = random.randint(0, len(filenames) - num_frames_per_clip)
-    for i in range(s_index, s_index + num_frames_per_clip):
+    if uniform_sampling:
+      files = random.sample(range(len(filenames)), num_frames_per_clip)
+      files = sorted(files)
+    else:
+      s_index = random.randint(0, len(filenames) - num_frames_per_clip)
+      files = range(s_index, s_index + num_frames_per_clip)
+    for i in files:
       image_name = str(filename) + '/' + str(filenames[i])
       img = Image.open(image_name)
       img_data = np.array(img)
       ret_arr.append(img_data)
   return ret_arr, s_index
 
-def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=16, crop_size=112, shuffle=False, embeddings=False):
+def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=16, crop_size=112, shuffle=False, embeddings=False, uniform_sampling):
   lines = open(filename,'r')
   read_dirnames = []
   data = []
@@ -86,7 +91,7 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
     if not shuffle:
       pass
       # print("Loading a video clip from {}...".format(dirname))
-    tmp_data, s_index = get_frames_data(dirname, num_frames_per_clip)
+    tmp_data, s_index = get_frames_data(dirname, num_frames_per_clip, uniform_sampling=uniform_sampling)
     # video is at [s_index, s_index + num_frames_per_clip)
     img_datas = [];
     embed_imgs = []
