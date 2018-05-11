@@ -15,7 +15,6 @@ flags.DEFINE_integer('batch_size', 4, 'Number of videos to sort at once.')
 flags.DEFINE_integer('percent_train', 16, 'Percentage of data the classifer will be trained on.')
 flags.DEFINE_integer('percent_dev', 4, 'Percentage of data in the dev set.')
 
-
 FLAGS = flags.FLAGS
 learning_rate = 10 ** -FLAGS.learning_rate_nl10
 
@@ -47,8 +46,9 @@ orig_vars = slim.get_variables_to_restore()
 
 with tf.variable_scope('post_conv'):
   # pre_logit = tf.reshape(pre_logit, [total_size, 2048])
-  embeddings = layers.fully_connected(pre_logit, 10)
-  scores = layers.fully_connected(embeddings, 1, activation_fn=None)
+  embeddings = layers.fully_connected(pre_logit, 1024, activation_fn=None)
+  activations = tf.nn.relu(embeddings)
+  scores = layers.fully_connected(activations, 1, activation_fn=None)
   scores = tf.reshape(scores, [batch_size, video_size, 1])
 
 post_conv_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='post_conv')
@@ -129,7 +129,7 @@ restore_model = slim.assign_from_checkpoint_fn(
 percent_test = 100 - FLAGS.percent_train - FLAGS.percent_dev
 
 split_id = '%d_%d_%d' % (FLAGS.percent_train, FLAGS.percent_dev, percent_test)
-experiment_id = 'retrained_sortnet_l%d_f%d_b%d_d%d' % (FLAGS.learning_rate_nl10, FLAGS.num_frames, FLAGS.batch_size, FLAGS.percent_dev) 
+experiment_id = '5fps_sortnet_1024_l%d_f%d_b%d_d%d' % (FLAGS.learning_rate_nl10, FLAGS.num_frames, FLAGS.batch_size, FLAGS.percent_dev) 
 
 with tf.Session() as sess:
   # print(sess.run(batch_kendall_tau(tf.constant([[1, 2, 3, 4, 5], [1, 3, 2, 4, 5]], dtype=tf.float32))))
@@ -147,7 +147,7 @@ with tf.Session() as sess:
     restore_model(sess)
   for _ in range(10000000):
     arr, nbs, rdn, vl = input_data.read_clip(
-          '../list/s_sortnet_train_%s.list' % split_id, 
+          '../list/s5_sortnet_train_%s.list' % split_id, 
           batch_size,
           num_frames_per_clip=video_size,
           start_pos=0, 
@@ -165,7 +165,8 @@ with tf.Session() as sess:
       saver.save(sess, '../models/' + experiment_id + '/checkpoint', global_step = time)
     if time % 10 == 0:
       arr, nbs, rdn, vl = input_data.read_clip(
-	    '../list/s_dev_%s.list' % split_id, 
+	    '../list/s5_dev_%s.list' % split_id, 
+
 	    batch_size, 
 	    num_frames_per_clip=video_size,
 	    start_pos=0, 
