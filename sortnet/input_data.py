@@ -72,6 +72,7 @@ def read_clip(filename, batch_size, uniform_sampling, start_pos=-1, num_frames_p
   read_dirnames = []
   data = []
   embed = []
+  labels = []
   batch_index = 0
   next_batch_start = -1
   lines = list(lines)
@@ -96,6 +97,7 @@ def read_clip(filename, batch_size, uniform_sampling, start_pos=-1, num_frames_p
       break
     line = lines[index].strip('\n').split()
     dirname = line[0]
+    labels.append(int(line[1]))
     if not shuffle:
       print("Loading a video clip from {}...".format(dirname))
     tmp_data, _ = get_frames_data(dirname, uniform_sampling, num_frames_per_clip)
@@ -125,7 +127,7 @@ def read_clip(filename, batch_size, uniform_sampling, start_pos=-1, num_frames_p
       data.append(img_datas)
       embed.append(embeddings[video_indices[-1], :, :])
   np_arr_data = np.array(data).astype(np.float32)
-  return np_arr_data, next_batch_start, read_dirnames, valid_len
+  return np_arr_data, next_batch_start, read_dirnames, valid_len, np.array(labels)
 
 def read_clip_full(dirname, crop_size=224):
   img_names = []
